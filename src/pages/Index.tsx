@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,80 +7,352 @@ import { Progress } from '@/components/ui/progress';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
 
-interface Level {
-  id: number;
-  name: string;
-  difficulty: string;
-  stars: number;
-  reward: number;
-  status: 'completed' | 'current' | 'locked';
-}
-
 interface Character {
   id: number;
   name: string;
-  rarity: number;
-  role: string;
+  rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'ancient';
+  type: 'charge' | 'ambush' | 'ranged' | 'healing' | 'support' | 'magic' | 'bomber';
   image: string;
-  color: string;
+  imageUrl?: string;
+  level: number;
+  power: number;
   hp: number;
   attack: number;
   defense: number;
+  critRate: number;
   skill: string;
-  description: string;
-  imageUrl?: string;
+  owned: boolean;
+  topping?: string[];
   lovePartner?: number;
 }
 
+interface Kingdom {
+  level: number;
+  cookies: number;
+  gems: number;
+  buildings: Building[];
+}
+
+interface Building {
+  id: number;
+  name: string;
+  level: number;
+  icon: string;
+  production: number;
+  upgradeTime: number;
+}
+
+interface Stage {
+  id: number;
+  world: string;
+  stage: string;
+  difficulty: number;
+  stars: number;
+  unlocked: boolean;
+}
+
 const Index = () => {
-  const [activeTab, setActiveTab] = useState<'characters' | 'levels'>('characters');
-  const [coins, setCoins] = useState(350);
-  const [playingLevel, setPlayingLevel] = useState<Level | null>(null);
+  const [activeScreen, setActiveScreen] = useState<'kingdom' | 'battle' | 'gacha' | 'team'>('kingdom');
+  const [selectedChar, setSelectedChar] = useState<Character | null>(null);
+  const [kingdom, setKingdom] = useState<Kingdom>({
+    level: 12,
+    cookies: 15420,
+    gems: 350,
+    buildings: [
+      { id: 1, name: 'Замок', level: 10, icon: '🏰', production: 100, upgradeTime: 3600 },
+      { id: 2, name: 'Лаборатория', level: 8, icon: '🧪', production: 50, upgradeTime: 1800 },
+      { id: 3, name: 'Ферма', level: 9, icon: '🌾', production: 75, upgradeTime: 2400 },
+      { id: 4, name: 'Желейная Шахта', level: 7, icon: '⛏️', production: 60, upgradeTime: 2100 },
+    ]
+  });
+
+  const [team, setTeam] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [gacha, setGacha] = useState({ pulling: false, result: null as Character | null });
   const [battleProgress, setBattleProgress] = useState(0);
-  const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
-  const [levels, setLevels] = useState<Level[]>([
-    { id: 1, name: 'Сладкий Лес', difficulty: 'Легко', stars: 3, reward: 100, status: 'completed' },
-    { id: 2, name: 'Шоколадная Гора', difficulty: 'Средне', stars: 2, reward: 200, status: 'completed' },
-    { id: 3, name: 'Карамельная Пещера', difficulty: 'Средне', stars: 3, reward: 250, status: 'completed' },
-    { id: 4, name: 'Королевство Желе', difficulty: 'Сложно', stars: 1, reward: 300, status: 'current' },
-    { id: 5, name: 'Башня Тьмы', difficulty: 'Очень сложно', stars: 0, reward: 500, status: 'locked' },
-    { id: 6, name: 'Ледяная Пустыня', difficulty: 'Сложно', stars: 0, reward: 350, status: 'locked' },
-    { id: 7, name: 'Огненный Вулкан', difficulty: 'Очень сложно', stars: 0, reward: 600, status: 'locked' },
-    { id: 8, name: 'Облачный Замок', difficulty: 'Средне', stars: 0, reward: 400, status: 'locked' },
-  ]);
+  const [playingStage, setPlayingStage] = useState<Stage | null>(null);
 
   const characters: Character[] = [
-    { id: 1, name: 'Храброе Печенье', rarity: 5, role: 'Атакующий', image: '🍪', color: 'from-orange-400 to-amber-600', hp: 850, attack: 320, defense: 180, skill: 'Удар Героя', description: 'Бесстрашный воин, готовый защитить королевство от любой угрозы. Мастер ближнего боя.' },
-    { id: 2, name: 'Клубничное Печенье', rarity: 4, role: 'Целитель', image: '🍓', color: 'from-pink-400 to-rose-600', hp: 600, attack: 150, defense: 120, skill: 'Ягодное Исцеление', description: 'Нежное и заботливое печенье, которое лечит союзников сладкой клубничной магией.' },
-    { id: 3, name: 'Шоколадное Печенье', rarity: 5, role: 'Защитник', image: '🍫', color: 'from-amber-700 to-orange-900', hp: 1200, attack: 200, defense: 350, skill: 'Шоколадная Стена', description: 'Несокрушимый танк с крепкой шоколадной броней. Защищает команду от вражеских атак.' },
-    { id: 4, name: 'Морское Печенье', rarity: 3, role: 'Поддержка', image: '🌊', color: 'from-blue-400 to-cyan-600', hp: 500, attack: 120, defense: 100, skill: 'Прилив Силы', description: 'Дитя океана, усиливающее союзников волнами морской энергии.' },
-    { id: 5, name: 'Радужное Печенье', rarity: 5, role: 'Магия', image: '🌈', color: 'from-purple-400 to-pink-600', hp: 700, attack: 380, defense: 140, skill: 'Радужная Буря', description: 'Владеет всеми цветами радуги, создавая разрушительные магические заклинания.' },
-    { id: 6, name: 'Ванильное Печенье', rarity: 4, role: 'Атакующий', image: '🥛', color: 'from-yellow-200 to-amber-400', hp: 650, attack: 280, defense: 150, skill: 'Молочный Залп', description: 'Быстрый нападающий с высокой скоростью атаки и ванильным ароматом победы.' },
-    { id: 7, name: 'Ледяное Печенье', rarity: 5, role: 'Магия', image: '❄️', color: 'from-cyan-300 to-blue-500', hp: 720, attack: 340, defense: 160, skill: 'Ледяная Буря', description: 'Повелитель холода, замораживающий врагов арктическими заклинаниями.' },
-    { id: 8, name: 'Огненное Печенье', rarity: 5, role: 'Атакующий', image: '🔥', color: 'from-red-500 to-orange-600', hp: 800, attack: 400, defense: 140, skill: 'Пламенный Взрыв', description: 'Горящее печенье с невероятной силой атаки. Сжигает врагов дотла!' },
-    { id: 9, name: 'Лимонное Печенье', rarity: 3, role: 'Поддержка', image: '🍋', color: 'from-yellow-300 to-lime-400', hp: 480, attack: 100, defense: 90, skill: 'Лимонная Бодрость', description: 'Заряжает команду энергией и повышает скорость союзников.' },
-    { id: 10, name: 'Королевское Печенье', rarity: 5, role: 'Защитник', image: '👑', color: 'from-purple-600 to-indigo-800', hp: 1400, attack: 220, defense: 400, skill: 'Королевский Щит', description: 'Величественный правитель с непробиваемой защитой и королевской силой.' },
-    { id: 11, name: 'Ночное Печенье', rarity: 4, role: 'Магия', image: '🌙', color: 'from-indigo-600 to-purple-900', hp: 680, attack: 300, defense: 130, skill: 'Лунная Магия', description: 'Таинственное печенье, черпающее силу из ночного неба.' },
-    { id: 12, name: 'Кокосовое Печенье', rarity: 3, role: 'Целитель', image: '🥥', color: 'from-amber-200 to-stone-400', hp: 550, attack: 110, defense: 110, skill: 'Кокосовое Молоко', description: 'Простое, но эффективное печенье-целитель с тропическими способностями.' },
-    { id: 13, name: 'Виноградное Печенье', rarity: 4, role: 'Атакующий', image: '🍇', color: 'from-purple-400 to-violet-600', hp: 620, attack: 260, defense: 140, skill: 'Виноградный Залп', description: 'Стреляет виноградными снарядами по врагам с высокой точностью.' },
-    { id: 14, name: 'Драконье Печенье', rarity: 5, role: 'Магия', image: '🐉', color: 'from-emerald-500 to-teal-700', hp: 900, attack: 420, defense: 200, skill: 'Драконье Дыхание', description: 'Легендарное печенье с силой дракона. Самый мощный маг в королевстве!' },
-    { id: 15, name: 'Звездное Печенье', rarity: 5, role: 'Поддержка', image: '⭐', color: 'from-yellow-400 to-amber-600', hp: 750, attack: 180, defense: 160, skill: 'Звёздное Благословение', description: 'Дарует союзникам благословение звёзд, значительно усиливая их характеристики.' },
-    { id: 16, name: 'Золотой Сыр', rarity: 5, role: 'Атакующий', imageUrl: 'https://cdn.poehali.dev/files/0638c90f-4da4-48ab-ab9d-e29162e38801.png', image: '🏹', color: 'from-yellow-300 to-orange-500', hp: 950, attack: 450, defense: 200, skill: 'Золотая Стрела', description: 'Легендарная лучница с крыльями света. Её золотые стрелы пронзают самых сильных врагов.' },
-    { id: 17, name: 'Белая Лилия', rarity: 5, role: 'Целитель', imageUrl: 'https://cdn.poehali.dev/files/0c876b89-e93c-456e-b07c-ad5eaeaf3bc3.png', image: '🌸', color: 'from-gray-100 to-amber-200', hp: 720, attack: 180, defense: 150, skill: 'Благословение Лилии', description: 'Нежное и чистое печенье с силой исцеления. Её магия приносит мир и спокойствие.', lovePartner: 18 },
-    { id: 18, name: 'Тёмное Молоко', rarity: 5, role: 'Магия', imageUrl: 'https://cdn.poehali.dev/files/000231f0-2d58-4f44-a8f4-7bcb573da562.jpg', image: '🌀', color: 'from-blue-400 to-indigo-900', hp: 880, attack: 420, defense: 170, skill: 'Теневая Буря', description: 'Загадочное печенье из тени с огромной магической силой. Хранит тайную любовь.', lovePartner: 17 },
+    { 
+      id: 1, 
+      name: 'Храброе Печенье', 
+      rarity: 'epic', 
+      type: 'charge',
+      image: '⚔️', 
+      level: 60, 
+      power: 285000,
+      hp: 85000,
+      attack: 3200,
+      defense: 1800,
+      critRate: 28,
+      skill: 'Героический Натиск',
+      owned: true,
+      topping: ['Сладкое желе малины', 'Шоколадная стружка']
+    },
+    { 
+      id: 2, 
+      name: 'Клубничное Печенье', 
+      rarity: 'rare', 
+      type: 'healing',
+      image: '🍓', 
+      level: 58, 
+      power: 210000,
+      hp: 60000,
+      attack: 1500,
+      defense: 1200,
+      critRate: 15,
+      skill: 'Клубничный Нектар',
+      owned: true,
+      topping: ['Желе исцеления']
+    },
+    { 
+      id: 3, 
+      name: 'Эспрессо', 
+      rarity: 'epic', 
+      type: 'magic',
+      image: '☕', 
+      level: 60, 
+      power: 295000,
+      hp: 70000,
+      attack: 3800,
+      defense: 1400,
+      critRate: 35,
+      skill: 'Кофейная Магия',
+      owned: true,
+      topping: ['Шоколадная стружка']
+    },
+    { 
+      id: 4, 
+      name: 'Ликорис', 
+      rarity: 'epic', 
+      type: 'support',
+      image: '🎭', 
+      level: 55, 
+      power: 240000,
+      hp: 65000,
+      attack: 2100,
+      defense: 1600,
+      critRate: 20,
+      skill: 'Театр Иллюзий',
+      owned: true,
+      topping: ['Желе шоколада']
+    },
+    { 
+      id: 5, 
+      name: 'Холли Берри', 
+      rarity: 'ancient', 
+      type: 'charge',
+      image: '🛡️', 
+      level: 60, 
+      power: 320000,
+      hp: 120000,
+      attack: 2200,
+      defense: 3500,
+      critRate: 12,
+      skill: 'Божественный Щит',
+      owned: true,
+      topping: ['Желе крепости']
+    },
+    { 
+      id: 6, 
+      name: 'Ванильное Печенье', 
+      rarity: 'common', 
+      type: 'healing',
+      image: '🥛', 
+      level: 45, 
+      power: 150000,
+      hp: 50000,
+      attack: 1200,
+      defense: 900,
+      critRate: 10,
+      skill: 'Молочное Утешение',
+      owned: true
+    },
+    { 
+      id: 7, 
+      name: 'Чёрный Жемчуг', 
+      rarity: 'legendary', 
+      type: 'bomber',
+      image: '🌊', 
+      level: 60, 
+      power: 340000,
+      hp: 90000,
+      attack: 4200,
+      defense: 1500,
+      critRate: 40,
+      skill: 'Гнев Океана',
+      owned: false
+    },
+    { 
+      id: 8, 
+      name: 'Чистая Ваниль', 
+      rarity: 'ancient', 
+      type: 'healing',
+      image: '✨', 
+      level: 60, 
+      power: 310000,
+      hp: 75000,
+      attack: 1800,
+      defense: 2000,
+      critRate: 18,
+      skill: 'Свет Исцеления',
+      owned: false
+    },
+    {
+      id: 9,
+      name: 'Золотой Сыр',
+      rarity: 'ancient',
+      type: 'magic',
+      imageUrl: 'https://cdn.poehali.dev/files/0638c90f-4da4-48ab-ab9d-e29162e38801.png',
+      image: '🏹',
+      level: 60,
+      power: 355000,
+      hp: 95000,
+      attack: 4500,
+      defense: 2000,
+      critRate: 45,
+      skill: 'Золотая Стрела',
+      owned: true,
+      topping: ['Шоколадная стружка', 'Желе малины']
+    },
+    {
+      id: 10,
+      name: 'Белая Лилия',
+      rarity: 'ancient',
+      type: 'healing',
+      imageUrl: 'https://cdn.poehali.dev/files/0c876b89-e93c-456e-b07c-ad5eaeaf3bc3.png',
+      image: '🌸',
+      level: 60,
+      power: 315000,
+      hp: 72000,
+      attack: 1800,
+      defense: 1500,
+      critRate: 20,
+      skill: 'Благословение Лилии',
+      owned: true,
+      topping: ['Желе исцеления'],
+      lovePartner: 11
+    },
+    {
+      id: 11,
+      name: 'Тёмное Молоко',
+      rarity: 'legendary',
+      type: 'magic',
+      imageUrl: 'https://cdn.poehali.dev/files/000231f0-2d58-4f44-a8f4-7bcb573da562.jpg',
+      image: '🌙',
+      level: 60,
+      power: 345000,
+      hp: 88000,
+      attack: 4200,
+      defense: 1700,
+      critRate: 42,
+      skill: 'Теневая Буря',
+      owned: true,
+      topping: ['Шоколадная стружка', 'Желе малины'],
+      lovePartner: 10
+    },
   ];
 
-  const playLevel = (level: Level) => {
-    if (level.status === 'locked') return;
+  const [stages, setStages] = useState<Stage[]>([
+    { id: 1, world: 'Мир 1', stage: '1-1', difficulty: 1, stars: 3, unlocked: true },
+    { id: 2, world: 'Мир 1', stage: '1-10', difficulty: 2, stars: 3, unlocked: true },
+    { id: 3, world: 'Мир 2', stage: '2-1', difficulty: 3, stars: 2, unlocked: true },
+    { id: 4, world: 'Мир 3', stage: '3-5', difficulty: 5, stars: 1, unlocked: true },
+    { id: 5, world: 'Мир 4', stage: '4-1', difficulty: 7, stars: 0, unlocked: true },
+    { id: 6, world: 'Мир 5', stage: '5-1', difficulty: 10, stars: 0, unlocked: false },
+  ]);
+
+  const getRarityColor = (rarity: string) => {
+    switch(rarity) {
+      case 'common': return 'from-gray-300 to-gray-500';
+      case 'rare': return 'from-blue-400 to-blue-600';
+      case 'epic': return 'from-purple-400 to-purple-700';
+      case 'legendary': return 'from-yellow-400 to-orange-600';
+      case 'ancient': return 'from-pink-400 via-purple-500 to-indigo-600';
+      default: return 'from-gray-300 to-gray-500';
+    }
+  };
+
+  const getRarityBorder = (rarity: string) => {
+    switch(rarity) {
+      case 'common': return 'border-gray-400';
+      case 'rare': return 'border-blue-500';
+      case 'epic': return 'border-purple-500';
+      case 'legendary': return 'border-yellow-500';
+      case 'ancient': return 'border-pink-500';
+      default: return 'border-gray-400';
+    }
+  };
+
+  const getTypeIcon = (type: string) => {
+    switch(type) {
+      case 'charge': return '⚔️';
+      case 'ambush': return '🗡️';
+      case 'ranged': return '🏹';
+      case 'healing': return '💚';
+      case 'support': return '🎵';
+      case 'magic': return '✨';
+      case 'bomber': return '💣';
+      default: return '❓';
+    }
+  };
+
+  const handleGacha = () => {
+    if (kingdom.gems < 30) {
+      toast.error('Недостаточно кристаллов!');
+      return;
+    }
+
+    setKingdom({ ...kingdom, gems: kingdom.gems - 30 });
+    setGacha({ pulling: true, result: null });
     
-    setPlayingLevel(level);
+    setTimeout(() => {
+      const random = Math.random();
+      let result;
+      
+      if (random < 0.01) {
+        result = characters.find(c => c.rarity === 'ancient' && !c.owned) || characters[4];
+      } else if (random < 0.05) {
+        result = characters.find(c => c.rarity === 'legendary' && !c.owned) || characters[6];
+      } else if (random < 0.20) {
+        result = characters.find(c => c.rarity === 'epic') || characters[0];
+      } else {
+        result = characters.find(c => c.rarity === 'rare') || characters[1];
+      }
+      
+      setGacha({ pulling: false, result });
+      toast.success(`Вы получили: ${result.name}!`, {
+        description: `Редкость: ${result.rarity.toUpperCase()}`
+      });
+    }, 2000);
+  };
+
+  const upgradeBuilding = (buildingId: number) => {
+    const building = kingdom.buildings.find(b => b.id === buildingId);
+    if (building && kingdom.cookies >= building.production * 10) {
+      setKingdom({
+        ...kingdom,
+        cookies: kingdom.cookies - building.production * 10,
+        buildings: kingdom.buildings.map(b => 
+          b.id === buildingId ? { ...b, level: b.level + 1, production: b.production + 10 } : b
+        )
+      });
+      toast.success(`${building.name} улучшено до уровня ${building.level + 1}!`);
+    } else {
+      toast.error('Недостаточно печенюшек!');
+    }
+  };
+
+  const playStage = (stage: Stage) => {
+    if (!stage.unlocked) return;
+    
+    setPlayingStage(stage);
     setBattleProgress(0);
     
     const interval = setInterval(() => {
       setBattleProgress((prev) => {
         if (prev >= 100) {
           clearInterval(interval);
-          completeLevel(level);
+          completeStage(stage);
           return 100;
         }
         return prev + 10;
@@ -88,195 +360,312 @@ const Index = () => {
     }, 300);
   };
 
-  const completeLevel = (level: Level) => {
+  const completeStage = (stage: Stage) => {
     setTimeout(() => {
       const earnedStars = Math.floor(Math.random() * 3) + 1;
-      const newCoins = coins + level.reward;
-      setCoins(newCoins);
+      const reward = stage.difficulty * 50;
       
-      setLevels((prevLevels) => {
-        const updatedLevels = prevLevels.map((l) => {
-          if (l.id === level.id) {
-            return { ...l, stars: Math.max(l.stars, earnedStars), status: 'completed' as const };
-          }
-          if (l.id === level.id + 1 && l.status === 'locked' && earnedStars === 3) {
-            return { ...l, status: 'current' as const };
-          }
-          return l;
-        });
-        return updatedLevels;
+      setKingdom({ ...kingdom, cookies: kingdom.cookies + reward });
+      setStages(stages.map(s => {
+        if (s.id === stage.id) {
+          return { ...s, stars: Math.max(s.stars, earnedStars) };
+        }
+        if (s.id === stage.id + 1 && earnedStars === 3) {
+          return { ...s, unlocked: true };
+        }
+        return s;
+      }));
+      
+      toast.success(`Уровень пройден! +${reward} печенюшек`, {
+        description: `Получено звёзд: ${earnedStars}/3`
       });
       
-      if (earnedStars === 3) {
-        toast.success('🎉 Идеальная победа!', {
-          description: 'Следующий уровень разблокирован!',
-        });
-      }
-      
-      if (earnedStars < 3) {
-        toast.success(`Уровень пройден! +${level.reward} монет`, {
-          description: `Получено звёзд: ${earnedStars}/3. Получи 3 звезды, чтобы открыть следующий уровень!`,
-        });
-      }
-      
-      setPlayingLevel(null);
+      setPlayingStage(null);
       setBattleProgress(0);
     }, 500);
   };
 
-  const renderStars = (count: number, max: number = 5) => {
-    return (
-      <div className="flex gap-0.5">
-        {[...Array(max)].map((_, i) => (
-          <span key={i} className={i < count ? 'text-yellow-400' : 'text-gray-400'}>
-            ⭐
-          </span>
-        ))}
-      </div>
-    );
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-300 via-purple-300 to-blue-300 p-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-8 pt-6">
-          <h1 className="text-6xl font-bold mb-2 cookie-title">
-            COOKIE RUN KINGDOM
-          </h1>
-          <p className="text-white text-xl font-semibold drop-shadow-lg">Собери всех героев и пройди все уровни!</p>
-          
-          <div className="mt-4 inline-flex items-center gap-2 bg-white/90 px-6 py-3 rounded-full shadow-lg">
-            <Icon name="Coins" size={28} className="text-yellow-500" />
-            <span className="text-2xl font-bold text-purple-800">{coins}</span>
+    <div className="min-h-screen bg-gradient-to-br from-pink-200 via-purple-200 to-blue-200">
+      <div className="fixed top-0 left-0 right-0 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 shadow-lg z-50">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="text-3xl font-black text-white drop-shadow-lg">🍪 Cookie Kingdom</div>
+              <Badge className="bg-yellow-400 text-yellow-900 border-2 border-yellow-600 font-bold">
+                Ур. {kingdom.level}
+              </Badge>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <div className="bg-white/90 backdrop-blur rounded-full px-4 py-2 flex items-center gap-2 shadow-lg border-2 border-amber-400">
+                <span className="text-2xl">🍪</span>
+                <span className="font-bold text-amber-700">{kingdom.cookies.toLocaleString()}</span>
+              </div>
+              <div className="bg-white/90 backdrop-blur rounded-full px-4 py-2 flex items-center gap-2 shadow-lg border-2 border-blue-400">
+                <span className="text-2xl">💎</span>
+                <span className="font-bold text-blue-700">{kingdom.gems}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-20">
+        <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-indigo-600 to-purple-600 shadow-2xl z-40 border-t-4 border-yellow-400">
+          <div className="max-w-7xl mx-auto px-4 py-3">
+            <div className="flex items-center justify-around">
+              {[
+                { id: 'kingdom', icon: 'Castle', label: 'Королевство' },
+                { id: 'team', icon: 'Users', label: 'Команда' },
+                { id: 'battle', icon: 'Sword', label: 'Битва' },
+                { id: 'gacha', icon: 'Gift', label: 'Гача' },
+              ].map((tab) => (
+                <Button
+                  key={tab.id}
+                  onClick={() => setActiveScreen(tab.id as any)}
+                  className={`flex flex-col items-center gap-1 px-6 py-3 rounded-2xl transition-all ${
+                    activeScreen === tab.id
+                      ? 'bg-white text-purple-600 scale-110 shadow-xl'
+                      : 'bg-transparent text-white hover:bg-white/20'
+                  }`}
+                >
+                  <Icon name={tab.icon} size={24} />
+                  <span className="text-xs font-bold">{tab.label}</span>
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="flex justify-center gap-4 mb-8">
-          <Button
-            onClick={() => setActiveTab('characters')}
-            className={`px-8 py-6 text-lg font-bold rounded-full transition-all ${
-              activeTab === 'characters'
-                ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white scale-105'
-                : 'bg-white/80 text-purple-700 hover:scale-105'
-            }`}
-          >
-            <Icon name="Users" className="mr-2" size={24} />
-            Персонажи
-          </Button>
-          <Button
-            onClick={() => setActiveTab('levels')}
-            className={`px-8 py-6 text-lg font-bold rounded-full transition-all ${
-              activeTab === 'levels'
-                ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white scale-105'
-                : 'bg-white/80 text-purple-700 hover:scale-105'
-            }`}
-          >
-            <Icon name="Map" className="mr-2" size={24} />
-            Уровни
-          </Button>
-        </div>
+        <div className="max-w-7xl mx-auto px-4 py-6 pb-24">
+          {activeScreen === 'kingdom' && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+              <div className="bg-gradient-to-r from-yellow-300 to-orange-400 rounded-3xl p-6 shadow-2xl border-4 border-yellow-500">
+                <h2 className="text-3xl font-black text-white drop-shadow-lg mb-4 flex items-center gap-3">
+                  <span>🏰</span> Ваше Королевство
+                </h2>
+                <p className="text-white font-semibold text-lg">Развивайте здания и производите ресурсы!</p>
+              </div>
 
-        {activeTab === 'characters' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
-            {characters.map((char) => (
-              <Card key={char.id} className="overflow-hidden hover:scale-105 transition-transform cursor-pointer border-4 border-white/50 shadow-2xl relative">
-                {char.lovePartner && (
-                  <div className="absolute top-2 right-2 z-10 bg-pink-500 text-white rounded-full p-2 shadow-lg animate-pulse">
-                    💕
-                  </div>
-                )}
-                <div className={`bg-gradient-to-br ${char.color} p-6 text-center relative`}>
-                  {char.imageUrl ? (
-                    <img src={char.imageUrl} alt={char.name} className="w-32 h-32 mx-auto mb-4 object-contain" />
-                  ) : (
-                    <div className="text-8xl mb-4 animate-bounce">{char.image}</div>
-                  )}
-                  <div className="flex justify-center mb-2">
-                    {renderStars(char.rarity)}
-                  </div>
-                </div>
-                <CardContent className="bg-white/95 p-4">
-                  <h3 className="text-xl font-bold text-purple-800 mb-2 text-center">{char.name}</h3>
-                  <div className="flex justify-center gap-2">
-                    <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-bold">
-                      {char.role}
-                    </Badge>
-                  </div>
-                  <Button 
-                    onClick={() => setSelectedCharacter(char)}
-                    className="w-full mt-4 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold rounded-full"
-                  >
-                    Подробнее
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {activeTab === 'levels' && (
-          <div className="space-y-4 animate-fade-in max-w-3xl mx-auto">
-            {levels.map((level) => (
-              <Card key={level.id} className={`overflow-hidden border-4 border-white/50 shadow-xl hover:scale-102 transition-transform ${
-                level.status === 'locked' ? 'opacity-60' : ''
-              }`}>
-                <CardContent className="bg-white/95 p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 flex-1">
-                      <div className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl ${
-                        level.status === 'completed' ? 'bg-gradient-to-r from-green-400 to-emerald-600' :
-                        level.status === 'current' ? 'bg-gradient-to-r from-yellow-400 to-orange-500' :
-                        'bg-gray-400'
-                      }`}>
-                        {level.status === 'locked' ? '🔒' : '🏰'}
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-2xl font-bold text-purple-800 mb-1">{level.name}</h3>
-                        <div className="flex gap-3 items-center flex-wrap">
-                          <Badge className={`font-bold ${
-                            level.difficulty === 'Легко' ? 'bg-green-500' :
-                            level.difficulty === 'Средне' ? 'bg-yellow-500' :
-                            level.difficulty === 'Сложно' ? 'bg-orange-500' :
-                            'bg-red-600'
-                          }`}>
-                            {level.difficulty}
-                          </Badge>
-                          <span className="text-sm text-gray-600 font-semibold">
-                            <Icon name="Coins" className="inline mr-1" size={16} />
-                            {level.reward} монет
-                          </span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {kingdom.buildings.map((building) => (
+                  <Card key={building.id} className="overflow-hidden border-4 border-purple-300 shadow-xl hover:scale-105 transition-transform">
+                    <CardContent className="p-0">
+                      <div className="bg-gradient-to-br from-blue-400 to-purple-500 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="text-5xl">{building.icon}</div>
+                            <div>
+                              <h3 className="text-xl font-black text-white drop-shadow">{building.name}</h3>
+                              <Badge className="bg-white/90 text-purple-700 font-bold">Ур. {building.level}</Badge>
+                            </div>
+                          </div>
                         </div>
-                        <div className="mt-2">
-                          {renderStars(level.stars, 3)}
+                        
+                        <div className="bg-white/20 backdrop-blur rounded-xl p-4 mb-4">
+                          <div className="flex items-center justify-between text-white font-bold">
+                            <span>Производство:</span>
+                            <span className="text-yellow-300">+{building.production}/час</span>
+                          </div>
+                        </div>
+
+                        <Button 
+                          onClick={() => upgradeBuilding(building.id)}
+                          className="w-full bg-gradient-to-r from-green-400 to-emerald-500 hover:from-green-500 hover:to-emerald-600 text-white font-black text-lg shadow-lg border-2 border-green-600"
+                        >
+                          Улучшить ({building.production * 10} 🍪)
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeScreen === 'team' && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+              <div className="bg-gradient-to-r from-purple-400 to-pink-500 rounded-3xl p-6 shadow-2xl border-4 border-purple-600">
+                <h2 className="text-3xl font-black text-white drop-shadow-lg mb-4 flex items-center gap-3">
+                  <Icon name="Users" className="text-white" /> Ваша Команда
+                </h2>
+                <p className="text-white font-semibold text-lg">Управляйте своими печеньками!</p>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {characters.filter(c => c.owned).map((char) => (
+                  <Card 
+                    key={char.id} 
+                    onClick={() => setSelectedChar(char)}
+                    className={`overflow-hidden cursor-pointer hover:scale-105 transition-transform border-4 ${getRarityBorder(char.rarity)} shadow-2xl relative`}
+                  >
+                    {char.lovePartner && (
+                      <div className="absolute top-2 right-2 z-10 bg-pink-500 text-white rounded-full p-1.5 shadow-lg animate-pulse">
+                        💕
+                      </div>
+                    )}
+                    <div className={`bg-gradient-to-br ${getRarityColor(char.rarity)} p-4`}>
+                      {char.imageUrl ? (
+                        <img src={char.imageUrl} alt={char.name} className="w-24 h-24 mx-auto object-contain drop-shadow-2xl" />
+                      ) : (
+                        <div className="text-6xl text-center mb-2">{char.image}</div>
+                      )}
+                      
+                      <div className="text-center">
+                        <Badge className="bg-white/90 text-xs font-bold mb-2">
+                          {getTypeIcon(char.type)} {char.type.toUpperCase()}
+                        </Badge>
+                        <h3 className="text-white font-black text-sm drop-shadow">{char.name}</h3>
+                        <p className="text-white/90 font-bold text-xs">Ур. {char.level}</p>
+                        <div className="bg-white/20 backdrop-blur rounded-lg px-2 py-1 mt-2">
+                          <p className="text-white font-bold text-xs">⚡ {char.power.toLocaleString()}</p>
                         </div>
                       </div>
                     </div>
-                    <Button 
-                      disabled={level.status === 'locked'}
-                      onClick={() => playLevel(level)}
-                      className={`px-6 py-3 rounded-full font-bold ${
-                        level.status === 'locked' 
-                          ? 'bg-gray-400 cursor-not-allowed' 
-                          : 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700'
-                      }`}
-                    >
-                      {level.status === 'locked' ? 'Заблокировано' : 
-                       level.status === 'completed' ? 'Пройти снова' : 
-                       'Играть'}
-                    </Button>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeScreen === 'battle' && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+              <div className="bg-gradient-to-r from-red-400 to-orange-500 rounded-3xl p-6 shadow-2xl border-4 border-red-600">
+                <h2 className="text-3xl font-black text-white drop-shadow-lg mb-4 flex items-center gap-3">
+                  <Icon name="Sword" className="text-white" /> Режим Битвы
+                </h2>
+                <p className="text-white font-semibold text-lg">Пройдите уровни и получите награды!</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {stages.map((stage) => (
+                  <Card 
+                    key={stage.id}
+                    className={`overflow-hidden border-4 shadow-xl hover:scale-105 transition-transform ${
+                      stage.unlocked ? 'border-green-400 cursor-pointer' : 'border-gray-400 opacity-50'
+                    }`}
+                  >
+                    <CardContent className="p-0">
+                      <div className={`bg-gradient-to-br ${stage.unlocked ? 'from-green-400 to-teal-500' : 'from-gray-400 to-gray-600'} p-6`}>
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <h3 className="text-2xl font-black text-white drop-shadow">{stage.world}</h3>
+                            <p className="text-white font-bold text-lg">{stage.stage}</p>
+                          </div>
+                          <div className="bg-white/20 backdrop-blur rounded-full w-16 h-16 flex items-center justify-center">
+                            <span className="text-3xl">{stage.unlocked ? '⚔️' : '🔒'}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-1 mb-4">
+                          {[1, 2, 3].map((star) => (
+                            <span key={star} className="text-2xl">
+                              {star <= stage.stars ? '⭐' : '☆'}
+                            </span>
+                          ))}
+                        </div>
+
+                        <Progress value={stage.difficulty * 10} className="mb-4" />
+                        
+                        {stage.unlocked && (
+                          <Button 
+                            className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white font-black shadow-lg border-2 border-yellow-600"
+                            onClick={() => playStage(stage)}
+                          >
+                            Начать Битву!
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeScreen === 'gacha' && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+              <div className="bg-gradient-to-r from-yellow-400 via-pink-400 to-purple-500 rounded-3xl p-6 shadow-2xl border-4 border-yellow-500">
+                <h2 className="text-3xl font-black text-white drop-shadow-lg mb-4 flex items-center gap-3">
+                  <Icon name="Gift" className="text-white" /> Система Гача
+                </h2>
+                <p className="text-white font-semibold text-lg">Получите новых печенек!</p>
+              </div>
+
+              <Card className="border-4 border-pink-400 shadow-2xl overflow-hidden">
+                <CardContent className="p-8 bg-gradient-to-br from-purple-100 to-pink-100">
+                  <div className="text-center space-y-6">
+                    {gacha.pulling ? (
+                      <div className="animate-bounce">
+                        <div className="text-9xl">🎁</div>
+                        <p className="text-2xl font-black text-purple-700 mt-4">Открываем...</p>
+                        <Progress value={50} className="mt-4" />
+                      </div>
+                    ) : gacha.result ? (
+                      <div className="animate-in zoom-in duration-500">
+                        <div className={`bg-gradient-to-br ${getRarityColor(gacha.result.rarity)} rounded-3xl p-8 mb-4 border-4 ${getRarityBorder(gacha.result.rarity)}`}>
+                          {gacha.result.imageUrl ? (
+                            <img src={gacha.result.imageUrl} alt={gacha.result.name} className="w-48 h-48 mx-auto object-contain drop-shadow-2xl" />
+                          ) : (
+                            <div className="text-9xl mb-4">{gacha.result.image}</div>
+                          )}
+                          <h3 className="text-3xl font-black text-white drop-shadow-lg">{gacha.result.name}</h3>
+                          <Badge className="bg-white/90 text-lg font-bold mt-2">
+                            {gacha.result.rarity.toUpperCase()}
+                          </Badge>
+                        </div>
+                        <Button 
+                          onClick={() => setGacha({ pulling: false, result: null })}
+                          className="bg-gradient-to-r from-green-400 to-emerald-500 text-white font-black text-xl px-8 py-6"
+                        >
+                          Отлично!
+                        </Button>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="text-9xl mb-6">🎰</div>
+                        <h3 className="text-3xl font-black text-purple-700 mb-4">Получите новое печенье!</h3>
+                        <div className="grid grid-cols-2 gap-4 mb-6 text-left bg-white/60 rounded-2xl p-6">
+                          <div>
+                            <p className="font-bold text-gray-600">Ancient:</p>
+                            <p className="text-pink-600 font-black">1%</p>
+                          </div>
+                          <div>
+                            <p className="font-bold text-gray-600">Legendary:</p>
+                            <p className="text-yellow-600 font-black">4%</p>
+                          </div>
+                          <div>
+                            <p className="font-bold text-gray-600">Epic:</p>
+                            <p className="text-purple-600 font-black">15%</p>
+                          </div>
+                          <div>
+                            <p className="font-bold text-gray-600">Rare:</p>
+                            <p className="text-blue-600 font-black">80%</p>
+                          </div>
+                        </div>
+                        <Button 
+                          onClick={handleGacha}
+                          disabled={kingdom.gems < 30}
+                          className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-black text-2xl px-12 py-8 rounded-2xl shadow-2xl border-4 border-pink-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Открыть за 30 💎
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
-      <Dialog open={!!playingLevel} onOpenChange={() => setPlayingLevel(null)}>
+      <Dialog open={!!playingStage} onOpenChange={() => setPlayingStage(null)}>
         <DialogContent className="bg-gradient-to-br from-purple-500 to-pink-500 border-4 border-white text-white">
           <DialogHeader>
-            <DialogTitle className="text-3xl font-bold text-center mb-4">
-              {playingLevel?.name}
+            <DialogTitle className="text-3xl font-bold text-center text-white mb-4">
+              {playingStage?.world} - {playingStage?.stage}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
@@ -292,82 +681,103 @@ const Index = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!selectedCharacter} onOpenChange={() => setSelectedCharacter(null)}>
-        <DialogContent className="bg-white border-4 border-purple-300 max-w-md">
-          {selectedCharacter && (
-            <>
-              <div className={`bg-gradient-to-br ${selectedCharacter.color} p-8 -mt-6 -mx-6 rounded-t-lg relative`}>
-                {selectedCharacter.lovePartner && (
+      <Dialog open={!!selectedChar} onOpenChange={() => setSelectedChar(null)}>
+        <DialogContent className="max-w-md border-4 border-purple-400 bg-white">
+          {selectedChar && (
+            <div className="space-y-4 -mt-6 -mx-6">
+              <div className={`bg-gradient-to-br ${getRarityColor(selectedChar.rarity)} p-8 rounded-t-lg relative`}>
+                {selectedChar.lovePartner && (
                   <div className="absolute top-4 right-4 bg-pink-500 text-white rounded-full px-3 py-1 shadow-lg text-sm font-bold flex items-center gap-1">
                     💕 В любви
                   </div>
                 )}
-                {selectedCharacter.imageUrl ? (
-                  <img src={selectedCharacter.imageUrl} alt={selectedCharacter.name} className="w-40 h-40 mx-auto mb-4 object-contain" />
+                {selectedChar.imageUrl ? (
+                  <img src={selectedChar.imageUrl} alt={selectedChar.name} className="w-40 h-40 mx-auto object-contain drop-shadow-2xl" />
                 ) : (
-                  <div className="text-9xl text-center mb-4">{selectedCharacter.image}</div>
+                  <div className="text-9xl text-center">{selectedChar.image}</div>
                 )}
-                <div className="flex justify-center mb-2">
-                  {renderStars(selectedCharacter.rarity)}
+                <div className="text-center mt-4">
+                  <Badge className="bg-white/90 font-bold text-lg mb-2">
+                    {getTypeIcon(selectedChar.type)} {selectedChar.type.toUpperCase()}
+                  </Badge>
+                  <h2 className="text-3xl font-black text-white drop-shadow-lg">{selectedChar.name}</h2>
+                  <p className="text-white/90 font-bold text-xl">Уровень {selectedChar.level}</p>
                 </div>
               </div>
-              <DialogHeader className="mt-4">
-                <DialogTitle className="text-3xl font-bold text-purple-800 text-center">
-                  {selectedCharacter.name}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="flex justify-center">
-                  <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-bold text-lg px-4 py-1">
-                    {selectedCharacter.role}
-                  </Badge>
-                </div>
-                
-                <p className="text-gray-700 text-center italic">
-                  {selectedCharacter.description}
-                </p>
-                
-                <div className="grid grid-cols-3 gap-3 mt-6">
-                  <div className="bg-gradient-to-br from-red-100 to-red-200 p-3 rounded-lg text-center">
-                    <Icon name="Heart" className="mx-auto mb-1 text-red-600" size={24} />
-                    <div className="text-xs text-gray-600 font-semibold">Здоровье</div>
-                    <div className="text-lg font-bold text-red-700">{selectedCharacter.hp}</div>
-                  </div>
-                  <div className="bg-gradient-to-br from-orange-100 to-orange-200 p-3 rounded-lg text-center">
-                    <Icon name="Sword" className="mx-auto mb-1 text-orange-600" size={24} />
-                    <div className="text-xs text-gray-600 font-semibold">Атака</div>
-                    <div className="text-lg font-bold text-orange-700">{selectedCharacter.attack}</div>
-                  </div>
-                  <div className="bg-gradient-to-br from-blue-100 to-blue-200 p-3 rounded-lg text-center">
-                    <Icon name="Shield" className="mx-auto mb-1 text-blue-600" size={24} />
-                    <div className="text-xs text-gray-600 font-semibold">Защита</div>
-                    <div className="text-lg font-bold text-blue-700">{selectedCharacter.defense}</div>
+
+              <div className="px-6 space-y-4">
+                <div className="bg-gradient-to-r from-orange-100 to-red-100 rounded-xl p-4 border-2 border-orange-300">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold text-gray-700">Мощь:</span>
+                    <span className="text-2xl font-black text-orange-600">⚡ {selectedChar.power.toLocaleString()}</span>
                   </div>
                 </div>
-                
-                <div className="bg-gradient-to-r from-purple-100 to-pink-100 p-4 rounded-lg">
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gradient-to-br from-red-100 to-red-200 rounded-xl p-3 border-2 border-red-300">
+                    <p className="text-xs font-bold text-gray-600">❤️ HP</p>
+                    <p className="text-lg font-black text-red-600">{selectedChar.hp.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-orange-100 to-orange-200 rounded-xl p-3 border-2 border-orange-300">
+                    <p className="text-xs font-bold text-gray-600">⚔️ Атака</p>
+                    <p className="text-lg font-black text-orange-600">{selectedChar.attack.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl p-3 border-2 border-blue-300">
+                    <p className="text-xs font-bold text-gray-600">🛡️ Защита</p>
+                    <p className="text-lg font-black text-blue-600">{selectedChar.defense.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-xl p-3 border-2 border-yellow-300">
+                    <p className="text-xs font-bold text-gray-600">💥 Крит</p>
+                    <p className="text-lg font-black text-yellow-600">{selectedChar.critRate}%</p>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-xl p-4 border-2 border-purple-300">
                   <div className="flex items-center gap-2 mb-2">
-                    <Icon name="Sparkles" className="text-purple-600" size={20} />
-                    <span className="font-bold text-purple-800">Особая способность</span>
+                    <Icon name="Sparkles" className="text-purple-600" />
+                    <span className="font-bold text-purple-800">Навык</span>
                   </div>
-                  <p className="text-purple-900 font-semibold">{selectedCharacter.skill}</p>
+                  <p className="text-purple-900 font-black text-lg">{selectedChar.skill}</p>
                 </div>
-                
-                {selectedCharacter.lovePartner && (
-                  <div className="bg-gradient-to-r from-pink-100 to-rose-100 p-4 rounded-lg border-2 border-pink-300">
+
+                {selectedChar.topping && selectedChar.topping.length > 0 && (
+                  <div className="bg-gradient-to-r from-green-100 to-teal-100 rounded-xl p-4 border-2 border-green-300">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xl">🍰</span>
+                      <span className="font-bold text-green-800">Топпинги</span>
+                    </div>
+                    <div className="space-y-1">
+                      {selectedChar.topping.map((top, i) => (
+                        <Badge key={i} className="bg-white text-green-700 font-bold mr-2">
+                          {top}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedChar.lovePartner && (
+                  <div className="bg-gradient-to-r from-pink-100 to-rose-100 rounded-xl p-4 border-2 border-pink-300">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-2xl">💕</span>
                       <span className="font-bold text-pink-800">Особая связь</span>
                     </div>
                     <p className="text-pink-900 font-semibold">
-                      {selectedCharacter.id === 17 
+                      {selectedChar.id === 10 
                         ? 'Связана крепкой дружбой с Тёмным Молоком. Вместе они непобедимы!' 
                         : 'Хранит особые чувства к Белой Лилии. Их связь делает обоих сильнее!'}
                     </p>
                   </div>
                 )}
+
+                <Button 
+                  className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-black text-lg py-6 rounded-xl"
+                  onClick={() => setSelectedChar(null)}
+                >
+                  Закрыть
+                </Button>
               </div>
-            </>
+            </div>
           )}
         </DialogContent>
       </Dialog>
