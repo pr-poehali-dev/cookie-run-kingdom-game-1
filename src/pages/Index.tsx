@@ -28,6 +28,8 @@ interface Character {
   defense: number;
   skill: string;
   description: string;
+  imageUrl?: string;
+  lovePartner?: number;
 }
 
 const Index = () => {
@@ -63,6 +65,9 @@ const Index = () => {
     { id: 13, name: 'Виноградное Печенье', rarity: 4, role: 'Атакующий', image: '🍇', color: 'from-purple-400 to-violet-600', hp: 620, attack: 260, defense: 140, skill: 'Виноградный Залп', description: 'Стреляет виноградными снарядами по врагам с высокой точностью.' },
     { id: 14, name: 'Драконье Печенье', rarity: 5, role: 'Магия', image: '🐉', color: 'from-emerald-500 to-teal-700', hp: 900, attack: 420, defense: 200, skill: 'Драконье Дыхание', description: 'Легендарное печенье с силой дракона. Самый мощный маг в королевстве!' },
     { id: 15, name: 'Звездное Печенье', rarity: 5, role: 'Поддержка', image: '⭐', color: 'from-yellow-400 to-amber-600', hp: 750, attack: 180, defense: 160, skill: 'Звёздное Благословение', description: 'Дарует союзникам благословение звёзд, значительно усиливая их характеристики.' },
+    { id: 16, name: 'Золотой Сыр', rarity: 5, role: 'Атакующий', imageUrl: 'https://cdn.poehali.dev/files/0638c90f-4da4-48ab-ab9d-e29162e38801.png', image: '🏹', color: 'from-yellow-300 to-orange-500', hp: 950, attack: 450, defense: 200, skill: 'Золотая Стрела', description: 'Легендарная лучница с крыльями света. Её золотые стрелы пронзают самых сильных врагов.' },
+    { id: 17, name: 'Белая Лилия', rarity: 5, role: 'Целитель', imageUrl: 'https://cdn.poehali.dev/files/0c876b89-e93c-456e-b07c-ad5eaeaf3bc3.png', image: '🌸', color: 'from-gray-100 to-amber-200', hp: 720, attack: 180, defense: 150, skill: 'Благословение Лилии', description: 'Нежное и чистое печенье с силой исцеления. Её магия приносит мир и спокойствие.', lovePartner: 18 },
+    { id: 18, name: 'Тёмное Молоко', rarity: 5, role: 'Магия', imageUrl: 'https://cdn.poehali.dev/files/000231f0-2d58-4f44-a8f4-7bcb573da562.jpg', image: '🌀', color: 'from-blue-400 to-indigo-900', hp: 880, attack: 420, defense: 170, skill: 'Теневая Буря', description: 'Загадочное печенье из тени с огромной магической силой. Хранит тайную любовь.', lovePartner: 17 },
   ];
 
   const playLevel = (level: Level) => {
@@ -174,9 +179,18 @@ const Index = () => {
         {activeTab === 'characters' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
             {characters.map((char) => (
-              <Card key={char.id} className="overflow-hidden hover:scale-105 transition-transform cursor-pointer border-4 border-white/50 shadow-2xl">
-                <div className={`bg-gradient-to-br ${char.color} p-6 text-center`}>
-                  <div className="text-8xl mb-4 animate-bounce">{char.image}</div>
+              <Card key={char.id} className="overflow-hidden hover:scale-105 transition-transform cursor-pointer border-4 border-white/50 shadow-2xl relative">
+                {char.lovePartner && (
+                  <div className="absolute top-2 right-2 z-10 bg-pink-500 text-white rounded-full p-2 shadow-lg animate-pulse">
+                    💕
+                  </div>
+                )}
+                <div className={`bg-gradient-to-br ${char.color} p-6 text-center relative`}>
+                  {char.imageUrl ? (
+                    <img src={char.imageUrl} alt={char.name} className="w-32 h-32 mx-auto mb-4 object-contain" />
+                  ) : (
+                    <div className="text-8xl mb-4 animate-bounce">{char.image}</div>
+                  )}
                   <div className="flex justify-center mb-2">
                     {renderStars(char.rarity)}
                   </div>
@@ -282,8 +296,17 @@ const Index = () => {
         <DialogContent className="bg-white border-4 border-purple-300 max-w-md">
           {selectedCharacter && (
             <>
-              <div className={`bg-gradient-to-br ${selectedCharacter.color} p-8 -mt-6 -mx-6 rounded-t-lg`}>
-                <div className="text-9xl text-center mb-4">{selectedCharacter.image}</div>
+              <div className={`bg-gradient-to-br ${selectedCharacter.color} p-8 -mt-6 -mx-6 rounded-t-lg relative`}>
+                {selectedCharacter.lovePartner && (
+                  <div className="absolute top-4 right-4 bg-pink-500 text-white rounded-full px-3 py-1 shadow-lg text-sm font-bold flex items-center gap-1">
+                    💕 В любви
+                  </div>
+                )}
+                {selectedCharacter.imageUrl ? (
+                  <img src={selectedCharacter.imageUrl} alt={selectedCharacter.name} className="w-40 h-40 mx-auto mb-4 object-contain" />
+                ) : (
+                  <div className="text-9xl text-center mb-4">{selectedCharacter.image}</div>
+                )}
                 <div className="flex justify-center mb-2">
                   {renderStars(selectedCharacter.rarity)}
                 </div>
@@ -329,6 +352,20 @@ const Index = () => {
                   </div>
                   <p className="text-purple-900 font-semibold">{selectedCharacter.skill}</p>
                 </div>
+                
+                {selectedCharacter.lovePartner && (
+                  <div className="bg-gradient-to-r from-pink-100 to-rose-100 p-4 rounded-lg border-2 border-pink-300">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-2xl">💕</span>
+                      <span className="font-bold text-pink-800">Особая связь</span>
+                    </div>
+                    <p className="text-pink-900 font-semibold">
+                      {selectedCharacter.id === 17 
+                        ? 'Связана крепкой дружбой с Тёмным Молоком. Вместе они непобедимы!' 
+                        : 'Хранит особые чувства к Белой Лилии. Их связь делает обоих сильнее!'}
+                    </p>
+                  </div>
+                )}
               </div>
             </>
           )}
